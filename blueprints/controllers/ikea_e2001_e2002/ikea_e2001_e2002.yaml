@@ -15,7 +15,7 @@ blueprint:
 
     🚀 This blueprint is part of the **[Awesome HA Blueprints](https://epmatt.github.io/awesome-ha-blueprints) project**.
 
-    ℹ️ Version 2022.08.08
+    ℹ️ Version 2022.08.09
   source_url: https://github.com/EPMatt/awesome-ha-blueprints/blob/main/blueprints/controllers/ikea_e2001_e2002/ikea_e2001_e2002.yaml
   domain: automation
   input:
@@ -25,22 +25,13 @@ blueprint:
       selector:
         select:
           options:
-            - deCONZ
-            - ZHA
             - Zigbee2MQTT
     controller_device:
-      name: (deCONZ, ZHA) Controller Device
-      description: The controller device to use for the automation. Choose a value only if the remote is integrated with deCONZ, ZHA.
+      name: Controller Device
+      description: The controller device to use for the automation.
       default: ''
       selector:
         device:
-    controller_entity:
-      name: (Zigbee2MQTT) Controller Entity
-      description: The action sensor of the controller to use for the automation. Choose a value only if the remote is integrated with Zigbee2MQTT.
-      default: ''
-      selector:
-        entity:
-          domain: sensor
     helper_last_controller_event:
       name: (Required) Helper - Last Controller Event
       description: Input Text used to store the last event fired by the controller. You will need to manually create a text input entity for this, please read the blueprint Additional Notes for more info.
@@ -350,22 +341,14 @@ variables:
   # integrations which need to store the previous press event to determine which button was released
   integrations_with_prev_event_storage: [zha, zigbee2mqtt]
   # build data to send within a controller event
-  controller_entity: !input controller_entity
   controller_device: !input controller_device
-  controller_id: '{% if integration_id=="zigbee2mqtt" %}{{controller_entity}}{% else %}{{controller_device}}{% endif %}'
 mode: restart
 max_exceeded: silent
 trigger:
-  # trigger for zigbee2mqtt
-  - platform: event
-    event_type: state_changed
-    event_data:
-      entity_id: !input controller_entity
-  # trigger for other integrations
+  # trigger for integrations
   - platform: event
     event_type:
-      - deconz_event
-      - zha_event
+      - state_changed
     event_data:
       device_id: !input controller_device
 condition:
@@ -376,10 +359,6 @@ condition:
         {%- set trigger_action -%}
         {%- if integration_id == "zigbee2mqtt" -%}
         {{ trigger.event.data.new_state.state }}
-        {%- elif integration_id == "deconz" -%}
-        {{ trigger.event.data.event }}
-        {%- elif integration_id == "zha" -%}
-        {{ trigger.event.data.command }}{{"_" if trigger.event.data.args|length > 0}}{{ trigger.event.data.args|join("_") }}
         {%- endif -%}
         {%- endset -%}
         {{ trigger_action not in ["","None"] }}
@@ -398,10 +377,6 @@ action:
       trigger_action: >-
         {%- if integration_id == "zigbee2mqtt" -%}
         {{ trigger.event.data.new_state.state }}
-        {%- elif integration_id == "deconz" -%}
-        {{ trigger.event.data.event }}
-        {%- elif integration_id == "zha" -%}
-        {{ trigger.event.data.command }}{{"_" if trigger.event.data.args|length > 0}}{{ trigger.event.data.args|join("_") }}
         {%- endif -%}
       trigger_delta: '{{ (as_timestamp(now()) - ((states(helper_last_controller_event) | from_json).t if helper_last_controller_event is not none and (states(helper_last_controller_event) | regex_match("^\{((\"a\": \".*\"|\"t\": \d+\.\d+)(, )?){2}\}$")) else as_timestamp("1970-01-01 00:00:00"))) * 1000 }}'
       last_controller_event: '{{ (states(helper_last_controller_event) | from_json).a if helper_last_controller_event is not none and (states(helper_last_controller_event) | regex_match("^\{((\"a\": \".*\"|\"t\": \d+\.\d+)(, )?){2}\}$")) else "" }}'
